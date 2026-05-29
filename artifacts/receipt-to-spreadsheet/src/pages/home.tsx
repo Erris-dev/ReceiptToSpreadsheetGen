@@ -1,8 +1,8 @@
 import { useState, useRef } from "react";
 import { useParseReceipt } from "@workspace/api-client-react";
-import { UploadCloud, FileSpreadsheet, Download, RefreshCw, AlertCircle, ReceiptText } from "lucide-react";
+import { UploadCloud, Download, RefreshCw, AlertCircle, ReceiptText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -19,6 +19,7 @@ export default function Home() {
   const [isDragging, setIsDragging] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const parseReceipt = useParseReceipt();
@@ -34,6 +35,7 @@ export default function Home() {
 
   const processFile = async (file: File) => {
     setFileError(null);
+    setApiError(null);
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
       setFileError("Please upload an image (JPG, PNG, WEBP)");
       return;
@@ -43,10 +45,18 @@ export default function Home() {
 
     try {
       const base64 = await toBase64(file);
-      parseReceipt.mutate({
-        data: { imageBase64: base64, mediaType: file.type }
-      });
-    } catch (err) {
+      parseReceipt.mutate(
+        { data: { imageBase64: base64, mediaType: file.type } },
+        {
+          onSuccess: (data) => {
+            const maybeError = (data as Record<string, unknown>).error;
+            if (typeof maybeError === "string") {
+              setApiError(maybeError);
+            }
+          },
+        }
+      );
+    } catch {
       setFileError("Failed to read file.");
     }
   };
@@ -68,6 +78,7 @@ export default function Home() {
   const reset = () => {
     setPreviewUrl(null);
     setFileError(null);
+    setApiError(null);
     parseReceipt.reset();
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -79,10 +90,9 @@ export default function Home() {
     let csvContent = `Vendor,${vendor || ""}\n`;
     csvContent += `Date,${date || ""}\n`;
     csvContent += `Currency,${currency || ""}\n\n`;
-    
+
     csvContent += `Description,Qty,Unit Price,Total\n`;
     items.forEach(item => {
-      // Escape descriptions that might have commas
       const desc = item.description && item.description.includes(",") ? `"${item.description}"` : (item.description ?? "");
       csvContent += `${desc},${item.qty ?? ""},${item.unit_price ?? ""},${item.total ?? ""}\n`;
     });
@@ -97,7 +107,12 @@ export default function Home() {
     document.body.removeChild(link);
   };
 
-  const isUploading = !parseReceipt.isPending && !parseReceipt.isSuccess && !parseReceipt.isError;
+  const hasError = !!apiError || parseReceipt.isError;
+  const errorMessage = apiError
+    ?? "An unexpected error occurred while parsing the image.";
+
+  const isUploading = !parseReceipt.isPending && !parseReceipt.isSuccess && !hasError;
+  const isSuccess = parseReceipt.isSuccess && !apiError && parseReceipt.data;
 
   return (
     <div className="min-h-screen flex flex-col items-center py-16 px-4 sm:px-6">
@@ -110,7 +125,7 @@ export default function Home() {
             Receipt to Spreadsheet
           </h1>
         </div>
-        {(parseReceipt.isSuccess || parseReceipt.isError) && (
+        {(isSuccess || hasError) && (
           <Button variant="outline" onClick={reset} data-testid="button-scan-again">
             <RefreshCw className="w-4 h-4 mr-2" />
             Scan another
@@ -145,7 +160,7 @@ export default function Home() {
               </div>
               <h3 className="text-lg font-medium text-foreground mb-2">Drop your receipt here</h3>
               <p className="text-muted-foreground mb-6">or click to browse from your computer</p>
-              
+
               {fileError ? (
                 <p className="text-sm font-medium text-destructive mt-4">{fileError}</p>
               ) : (
@@ -163,19 +178,18 @@ export default function Home() {
           </div>
         )}
 
-        {parseReceipt.isError && (
+        {hasError && (
           <div className="w-full max-w-xl mx-auto mt-10">
             <Alert variant="destructive" className="bg-amber-50 border-amber-200 text-amber-900" data-testid="card-error">
               <AlertCircle className="h-5 w-5 text-amber-600" />
               <AlertTitle className="text-amber-800 font-semibold text-base">We couldn't read that receipt</AlertTitle>
               <AlertDescription className="text-amber-700/90 mt-2 text-sm leading-relaxed">
-                {/* @ts-ignore */}
-                {parseReceipt.error?.response?.data?.error || "An unexpected error occurred while parsing the image."}
+                {errorMessage}
               </AlertDescription>
               <div className="mt-6">
-                <Button 
-                  variant="outline" 
-                  className="bg-white border-amber-200 text-amber-800 hover:bg-amber-100/50 hover:text-amber-900" 
+                <Button
+                  variant="outline"
+                  className="bg-white border-amber-200 text-amber-800 hover:bg-amber-100/50 hover:text-amber-900"
                   onClick={reset}
                   data-testid="button-try-again"
                 >
@@ -186,15 +200,15 @@ export default function Home() {
           </div>
         )}
 
-        {parseReceipt.isSuccess && parseReceipt.data && (
+        {isSuccess && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             <div className="lg:col-span-4 flex flex-col gap-4">
               <div className="bg-card p-2 rounded-2xl border border-border shadow-sm">
-                <img 
-                  src={previewUrl!} 
-                  alt="Receipt thumbnail" 
+                <img
+                  src={previewUrl!}
+                  alt="Receipt thumbnail"
                   className="w-full h-auto object-contain rounded-xl"
-                  style={{ maxHeight: '600px' }}
+                  style={{ maxHeight: "600px" }}
                 />
               </div>
             </div>
@@ -212,10 +226,10 @@ export default function Home() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1">Currency</p>
-                    <p className="font-medium text-foreground">{parseReceipt.data.currency || "USD"}</p>
+                    <p className="font-medium text-foreground">{parseReceipt.data.currency || "Unknown"}</p>
                   </div>
                 </div>
-                
+
                 <Button onClick={downloadCsv} className="shrink-0" data-testid="button-download-csv">
                   <Download className="w-4 h-4 mr-2" />
                   Download CSV
@@ -255,7 +269,7 @@ export default function Home() {
                     )}
                   </TableBody>
                 </Table>
-                
+
                 <div className="bg-muted/30 border-t border-border p-4">
                   <div className="space-y-2 w-full max-w-[240px] ml-auto">
                     {parseReceipt.data.subtotal !== null && (

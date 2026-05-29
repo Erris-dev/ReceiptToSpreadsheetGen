@@ -34,25 +34,26 @@ Rules:
 - Always return valid JSON, no matter what`;
 
 router.post("/parse-receipt", async (req, res): Promise<void> => {
-  const { imageBase64, mediaType } = req.body as {
-    imageBase64?: string;
-    mediaType?: string;
-  };
-
-  if (!imageBase64 || !mediaType) {
-    res.status(400).json({ error: "imageBase64 and mediaType are required" });
+  if (!process.env.GEMINI_API_KEY) {
+    req.log.warn("GEMINI_API_KEY is not configured");
+    res.json({ error: "API key not configured" });
     return;
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    req.log.error("GEMINI_API_KEY is not configured");
-    res.status(500).json({ error: "Gemini API key is not configured" });
-    return;
-  }
+  req.log.info({ keyPrefix: process.env.GEMINI_API_KEY.slice(0, 5) }, "GEMINI_API_KEY loaded");
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const { imageBase64, mediaType } = req.body as {
+      imageBase64?: string;
+      mediaType?: string;
+    };
+
+    if (!imageBase64 || !mediaType) {
+      res.json({ error: "imageBase64 and mediaType are required" });
+      return;
+    }
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const result = await model.generateContent([
@@ -65,33 +66,26 @@ router.post("/parse-receipt", async (req, res): Promise<void> => {
       },
     ]);
 
-    const rawText = result.response.text().trim();
+    const text = result.response.text();
 
-    // Strip markdown code blocks if present
-    const jsonText = rawText
-      .replace(/^```json\s*/i, "")
-      .replace(/^```\s*/i, "")
-      .replace(/\s*```$/, "")
+    const clean = text
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
       .trim();
 
     let parsed: Record<string, unknown>;
     try {
-      parsed = JSON.parse(jsonText) as Record<string, unknown>;
+      parsed = JSON.parse(clean) as Record<string, unknown>;
     } catch {
-      req.log.warn({ rawText }, "Failed to parse Gemini response as JSON");
-      res.status(422).json({ error: "Could not parse receipt — please try a clearer photo" });
-      return;
-    }
-
-    if ("error" in parsed && typeof parsed.error === "string") {
-      res.status(422).json({ error: parsed.error });
+      req.log.warn({ raw: text }, "Failed to parse Gemini response as JSON");
+      res.json({ error: "Could not parse receipt" });
       return;
     }
 
     res.json(parsed);
   } catch (err) {
-    req.log.error({ err }, "Gemini API error");
-    res.status(500).json({ error: "Failed to process receipt image" });
+    req.log.error({ err }, "Unexpected error in parse-receipt");
+    res.json({ error: "Could not parse receipt" });
   }
 });
 
