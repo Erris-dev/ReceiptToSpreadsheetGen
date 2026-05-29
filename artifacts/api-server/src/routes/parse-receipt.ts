@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Mistral } from "@mistralai/mistralai";
 
 const router: IRouter = Router();
 
@@ -34,13 +34,13 @@ Rules:
 - Always return valid JSON, no matter what`;
 
 router.post("/parse-receipt", async (req, res): Promise<void> => {
-  if (!process.env.GEMINI_API_KEY) {
-    req.log.warn("GEMINI_API_KEY is not configured");
+  if (!process.env.MISTRAL_API_KEY) {
+    req.log.warn("MISTRAL_API_KEY is not configured");
     res.json({ error: "API key not configured" });
     return;
   }
 
-  req.log.info({ keyPrefix: process.env.GEMINI_API_KEY.slice(0, 5) }, "GEMINI_API_KEY loaded");
+  req.log.info({ keyPrefix: process.env.MISTRAL_API_KEY.slice(0, 5) }, "MISTRAL_API_KEY loaded");
 
   try {
     const { imageBase64, mediaType } = req.body as {
@@ -53,22 +53,33 @@ router.post("/parse-receipt", async (req, res): Promise<void> => {
       return;
     }
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
 
-    const result = await model.generateContent([
-      { text: SYSTEM_PROMPT },
-      {
-        inlineData: {
-          data: imageBase64,
-          mimeType: mediaType as "image/jpeg" | "image/png" | "image/webp",
+    const response = await client.chat.complete({
+      model: "pixtral-12b-2409",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              imageUrl: `data:${mediaType};base64,${imageBase64}`,
+            },
+            {
+              type: "text",
+              text: SYSTEM_PROMPT,
+            },
+          ],
         },
-      },
-    ]);
+      ],
+    });
 
-    const text = result.response.text();
+    const text = response.choices?.[0]?.message?.content ?? "";
+    const textStr = Array.isArray(text)
+      ? text.map((c) => ("text" in c ? c.text : "")).join("")
+      : String(text);
 
-    const clean = text
+    const clean = textStr
       .replace(/```json/g, "")
       .replace(/```/g, "")
       .trim();
@@ -77,19 +88,22 @@ router.post("/parse-receipt", async (req, res): Promise<void> => {
     try {
       parsed = JSON.parse(clean) as Record<string, unknown>;
     } catch {
-      req.log.warn({ raw: text }, "Failed to parse Gemini response as JSON");
+      req.log.warn({ raw: textStr }, "Failed to parse Mistral response as JSON");
       res.json({ error: "Could not parse receipt" });
       return;
     }
 
     res.json(parsed);
   } catch (err) {
-    const status = (err as { status?: number }).status;
+    const status = (err as { status?: number; statusCode?: number }).status
+      ?? (err as { status?: number; statusCode?: number }).statusCode;
+
     if (status === 429) {
-      req.log.warn({ err }, "Gemini API rate limit exceeded");
-      res.json({ error: "Gemini API quota exceeded — please wait a moment and try again, or upgrade your API plan at https://ai.dev/rate-limit" });
+      req.log.warn({ err }, "Mistral API rate limit exceeded");
+      res.json({ error: "API quota exceeded — please wait a moment and try again" });
       return;
     }
+
     req.log.error({ err }, "Unexpected error in parse-receipt");
     res.json({ error: "Could not parse receipt" });
   }
