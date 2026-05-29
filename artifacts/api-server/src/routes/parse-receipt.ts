@@ -84,6 +84,12 @@ router.post("/parse-receipt", async (req, res): Promise<void> => {
 
     res.json(parsed);
   } catch (err) {
+    const status = (err as { status?: number }).status;
+    if (status === 429) {
+      req.log.warn({ err }, "Gemini API rate limit exceeded");
+      res.json({ error: "Gemini API quota exceeded — please wait a moment and try again, or upgrade your API plan at https://ai.dev/rate-limit" });
+      return;
+    }
     req.log.error({ err }, "Unexpected error in parse-receipt");
     res.json({ error: "Could not parse receipt" });
   }
