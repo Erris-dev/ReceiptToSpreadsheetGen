@@ -83,8 +83,8 @@ export default function Home() {
     csvContent += `Description,Qty,Unit Price,Total\n`;
     items.forEach(item => {
       // Escape descriptions that might have commas
-      const desc = item.description.includes(",") ? `"${item.description}"` : item.description;
-      csvContent += `${desc},${item.qty},${item.unitPrice},${item.total}\n`;
+      const desc = item.description && item.description.includes(",") ? `"${item.description}"` : (item.description ?? "");
+      csvContent += `${desc},${item.qty ?? ""},${item.unit_price ?? ""},${item.total ?? ""}\n`;
     });
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -245,10 +245,10 @@ export default function Home() {
                           <TableCell className="font-medium">{item.description}</TableCell>
                           <TableCell className="text-right text-muted-foreground font-mono">{item.qty}</TableCell>
                           <TableCell className="text-right text-muted-foreground font-mono">
-                            {item.unitPrice.toFixed(2)}
+                            {item.unit_price != null ? item.unit_price.toFixed(2) : "—"}
                           </TableCell>
                           <TableCell className="text-right font-mono font-medium">
-                            {item.total.toFixed(2)}
+                            {item.total != null ? item.total.toFixed(2) : "—"}
                           </TableCell>
                         </TableRow>
                       ))

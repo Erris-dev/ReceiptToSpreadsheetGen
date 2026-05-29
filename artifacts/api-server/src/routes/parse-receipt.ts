@@ -1,30 +1,37 @@
 import { Router, type IRouter } from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
-const SYSTEM_PROMPT = `You are a receipt parser. Extract structured data from the receipt image.
-Return ONLY valid JSON with this exact structure, no markdown, no extra text:
+const SYSTEM_PROMPT = `You are a receipt data extractor. Analyze this image and extract whatever data you can see.
+
+Return ONLY a raw JSON object. No markdown. No backticks. No explanation. Just the JSON.
+
+Use this exact structure:
 {
-  "vendor": "store name or null",
-  "date": "date string or null",
-  "currency": "3-letter currency code like USD, EUR, GBP",
+  "vendor": "string or null",
+  "date": "string or null",
+  "currency": "string or null",
   "items": [
-    { "description": "item name", "qty": 1, "unitPrice": 0.00, "total": 0.00 }
+    {
+      "description": "string or null",
+      "qty": number or null,
+      "unit_price": number or null,
+      "total": number or null
+    }
   ],
-  "subtotal": 0.00,
-  "tax": 0.00,
-  "total": 0.00
+  "subtotal": number or null,
+  "tax": number or null,
+  "total": number or null
 }
 
 Rules:
-- If the image is not a receipt or is unreadable, respond with: { "error": "reason" }
-- All numeric values must be numbers (not strings)
-- qty should be a number (default 1 if not shown)
-- Use null for vendor or date if not visible
-- subtotal, tax, or total can be null if not shown on receipt
-- currency must always be a non-null string`;
+- If you can read a value clearly, fill it in
+- If a value is missing, unclear, or not visible, set it to null
+- Never guess or make up values
+- If there are no line items visible, return "items": []
+- If the image is not a receipt at all, return { "error": "Not a receipt" }
+- Always return valid JSON, no matter what`;
 
 router.post("/parse-receipt", async (req, res): Promise<void> => {
   const { imageBase64, mediaType } = req.body as {

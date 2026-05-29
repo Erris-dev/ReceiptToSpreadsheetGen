@@ -29,12 +29,12 @@ export const ParseReceiptBody = zod.object({
 export const ParseReceiptResponse = zod.object({
   "vendor": zod.string().nullable(),
   "date": zod.string().nullable(),
-  "currency": zod.string(),
+  "currency": zod.string().nullable(),
   "items": zod.array(zod.object({
-  "description": zod.string(),
-  "qty": zod.number(),
-  "unitPrice": zod.number(),
-  "total": zod.number()
+  "description": zod.string().nullable(),
+  "qty": zod.number().nullable(),
+  "unit_price": zod.number().nullable(),
+  "total": zod.number().nullable()
 })),
   "subtotal": zod.number().nullable(),
   "tax": zod.number().nullable(),

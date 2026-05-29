@@ -12,7 +12,8 @@ export interface ParsedReceipt {
   vendor: string | null;
   /** @nullable */
   date: string | null;
-  currency: string;
+  /** @nullable */
+  currency: string | null;
   items: ReceiptItem[];
   /** @nullable */
   subtotal: number | null;

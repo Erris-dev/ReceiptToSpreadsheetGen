@@ -7,8 +7,12 @@
  */
 
 export interface ReceiptItem {
-  description: string;
-  qty: number;
-  unitPrice: number;
-  total: number;
+  /** @nullable */
+  description: string | null;
+  /** @nullable */
+  qty: number | null;
+  /** @nullable */
+  unit_price: number | null;
+  /** @nullable */
+  total: number | null;
 }

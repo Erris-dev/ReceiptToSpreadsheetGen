@@ -77,17 +77,17 @@ components:
       required:
         - description
         - qty
-        - unitPrice
+        - unit_price
         - total
       properties:
         description:
-          type: string
+          type: ["string", "null"]
         qty:
-          type: number
-        unitPrice:
-          type: number
+          type: ["number", "null"]
+        unit_price:
+          type: ["number", "null"]
         total:
-          type: number
+          type: ["number", "null"]
     ParsedReceipt:
       type: object
       required:
@@ -104,7 +104,7 @@ components:
         date:
           type: ["string", "null"]
         currency:
-          type: string
+          type: ["string", "null"]
         items:
           type: array
           items:
