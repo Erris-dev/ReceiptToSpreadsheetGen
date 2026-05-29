@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Receipt to Spreadsheet"
+version = "1.0.0"
+id = "artifacts/receipt-to-spreadsheet"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19706
+
+[services.development]
+run = "pnpm --filter @workspace/receipt-to-spreadsheet run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/receipt-to-spreadsheet", "run", "build" ]
+publicDir = "artifacts/receipt-to-spreadsheet/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19706"
+BASE_PATH = "/"

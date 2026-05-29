@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: receipt
+    description: Receipt parsing operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /parse-receipt:
+    post:
+      operationId: parseReceipt
+      tags: [receipt]
+      summary: Parse a receipt image
+      description: Accepts a base64 image and returns parsed receipt data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReceiptImageInput"
+      responses:
+        "200":
+          description: Parsed receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParsedReceipt"
+        "422":
+          description: Unreadable receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceiptError"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +60,65 @@ components:
           type: string
       required:
         - status
-
+    ReceiptImageInput:
+      type: object
+      required:
+        - imageBase64
+        - mediaType
+      properties:
+        imageBase64:
+          type: string
+          description: Base64-encoded image data
+        mediaType:
+          type: string
+          description: MIME type of the image (e.g. image/jpeg)
+    ReceiptItem:
+      type: object
+      required:
+        - description
+        - qty
+        - unitPrice
+        - total
+      properties:
+        description:
+          type: string
+        qty:
+          type: number
+        unitPrice:
+          type: number
+        total:
+          type: number
+    ParsedReceipt:
+      type: object
+      required:
+        - vendor
+        - date
+        - currency
+        - items
+        - subtotal
+        - tax
+        - total
+      properties:
+        vendor:
+          type: ["string", "null"]
+        date:
+          type: ["string", "null"]
+        currency:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReceiptItem"
+        subtotal:
+          type: ["number", "null"]
+        tax:
+          type: ["number", "null"]
+        total:
+          type: ["number", "null"]
+    ReceiptError:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string

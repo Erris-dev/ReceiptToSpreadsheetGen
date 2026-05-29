@@ -5,23 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-export interface HealthStatus {
-  status: string;
-}
-
-export interface ReceiptImageInput {
-  /** Base64-encoded image data */
-  imageBase64: string;
-  /** MIME type of the image (e.g. image/jpeg) */
-  mediaType: string;
-}
-
-export interface ReceiptItem {
-  description: string;
-  qty: number;
-  unitPrice: number;
-  total: number;
-}
+import type { ReceiptItem } from './receiptItem';
 
 export interface ParsedReceipt {
   /** @nullable */
@@ -37,8 +21,3 @@ export interface ParsedReceipt {
   /** @nullable */
   total: number | null;
 }
-
-export interface ReceiptError {
-  error: string;
-}
-

@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
+export interface ReceiptItem {
+  description: string;
+  qty: number;
+  unitPrice: number;
+  total: number;
 }
