@@ -1,6 +1,6 @@
 # Receipt to Spreadsheet
 
-Upload a photo of any receipt and get back a clean, exportable table of every line item — vendor, date, currency, quantities, prices, and totals.
+Upload a photo of any receipt and get back a clean, exportable table of every line item — vendor, date, currency, quantities, prices, and totals. All values are editable before export.
 
 ---
 
@@ -8,8 +8,8 @@ Upload a photo of any receipt and get back a clean, exportable table of every li
 
 1. **Drag-and-drop upload** — accepts JPG, PNG, or WEBP images of receipts
 2. **AI vision parsing** — sends the image to Mistral's `pixtral-12b-2409` model, which extracts structured JSON
-3. **Results table** — shows vendor, date, currency, line items (description / qty / unit price / total), subtotal, tax, and grand total
-4. **Download CSV** — one click exports the full parsed receipt
+3. **Editable results table** — every field (vendor, date, currency, line items, totals) is editable inline before export; rows can be added or deleted
+4. **Download CSV** — one click exports the corrected receipt data
 5. **Error states** — wrong file type (inline), unreadable receipt (yellow warning card), API quota errors (clear message)
 
 ---
@@ -36,8 +36,6 @@ Upload a photo of any receipt and get back a clean, exportable table of every li
 3. Click **Run** — both workflows start automatically
 4. Open the preview pane and drop a receipt photo in
 
-That's it. No build step, no local setup.
-
 ### Local clone
 
 ```bash
@@ -63,12 +61,28 @@ Open [http://localhost:5173](http://localhost:5173).
 
 ```
 artifacts/
-  api-server/                         Express API
-    src/routes/parse-receipt.ts       ← Mistral vision call lives here
-  receipt-to-spreadsheet/             React + Vite frontend
-    src/pages/home.tsx                ← all UI state lives here
+  api-server/
+    src/routes/parse-receipt.ts       Mistral vision call, JSON cleaning, error handling
+  receipt-to-spreadsheet/
+    src/
+      pages/
+        home.tsx                      State orchestrator — owns all receipt state
+      components/
+        receipt/
+          UploadZone.tsx              Drag-and-drop file picker with inline validation
+          LoadingCard.tsx             Spinner shown during the Mistral API call
+          ErrorCard.tsx               Amber warning card for model / API errors
+          MetaHeader.tsx              Editable vendor / date / currency + Download button
+          EditableTable.tsx           Line items table with add / remove row controls
+          FooterTotals.tsx            Editable subtotal / tax / total footer
+          ResultsView.tsx             Composes all result components with the receipt thumbnail
+          EditCell.tsx                Transparent inline input for table cells
+          EditMeta.tsx                Transparent inline input for metadata fields
+        ui/                           shadcn/ui primitives (button, card, table, …)
+      types/
+        receipt.ts                    EditableItem and EditableReceipt types
 lib/
-  api-spec/openapi.yaml               OpenAPI contract (source of truth)
+  api-spec/openapi.yaml               OpenAPI contract (source of truth for types and hooks)
   api-client-react/                   Generated React Query hooks
   api-zod/                            Generated Zod schemas
 ```
@@ -112,7 +126,6 @@ All fields except `items` can be `null` if not visible on the receipt.
 
 - **Retry with backoff** — Mistral returns a `retryDelay` hint on 429s; use it to auto-retry once before surfacing the error to the user
 - **Multi-page receipts** — let users upload several photos of the same long receipt and merge the parsed items into one table
-- **Editable table** — let users correct misread values inline before downloading the CSV
 - **Receipt history** — persist past scans in localStorage (or a DB) so users can re-download without re-uploading
 - **Currency formatting** — use `Intl.NumberFormat` with the detected currency code to show proper symbols and decimal conventions
 - **Image preprocessing** — auto-rotate, deskew, and boost contrast on the client before sending, to improve accuracy on phone photos
